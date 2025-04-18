@@ -39,13 +39,18 @@ public:
     tcflush(fd_, TCIFLUSH);
     tcsetattr(fd_, TCSANOW, &tio);
 
-    // --- トピック購読者を作成 ---
-    sub_ = this->create_subscription<std_msgs::msg::String>(
-      "angle_commands", 10,
-      std::bind(&SerialController::on_command, this, std::placeholders::_1));
+    // --- サブスクライバー (全体制御用) ---
+    sub_overall_ = this->create_subscription<std_msgs::msg::String>(
+      "overall_angle", 10,
+      std::bind(&SerialController::on_overall_command, this, std::placeholders::_1));
+    RCLCPP_INFO(this->get_logger(), "Subscribed to 'overall_angle' successfully.");
 
-    // 購読成功をログに出力
-    RCLCPP_INFO(this->get_logger(), "Subscribed to 'angle_commands' successfully.");
+    // --- サブスクライバー (モジュール単体制御用) ---
+    sub_module_ = this->create_subscription<std_msgs::msg::String>(
+      "module_angle", 10,
+      std::bind(&SerialController::on_module_command, this, std::placeholders::_1));
+    RCLCPP_INFO(this->get_logger(), "Subscribed to 'module_angle' successfully.");
+
     RCLCPP_INFO(this->get_logger(), "SerialController node started");
   }
 
@@ -58,68 +63,82 @@ public:
   }
 
 private:
-  void on_command(const std_msgs::msg::String::SharedPtr msg)
+  // 全体制御(A0p-XXX)を受信した時のコールバック
+  void on_overall_command(const std_msgs::msg::String::SharedPtr msg)
   {
     const auto &s = msg->data;
-    // 受信データをログに表示
-    RCLCPP_INFO(this->get_logger(), "Received topic data: '%s'", s.c_str());
+    RCLCPP_INFO(this->get_logger(), "[Overall] Received: '%s'", s.c_str());
 
-    if (s.size() < 7) {
-      RCLCPP_WARN(this->get_logger(), "Invalid command length: '%s'", s.c_str());
+    if (s.size() < 7 || s[0] != 'A') {
+      RCLCPP_WARN(this->get_logger(), "[Overall] Invalid format or prefix: '%s'", s.c_str());
+      return;
+    }
+    int sign = (s[3] == '-') ? -1 : +1;
+    int angle = sign * (((s[4]-'0')*100) + ((s[5]-'0')*10) + (s[6]-'0'));
+    if (angle < -180 || angle > 180) {
+      RCLCPP_WARN(this->get_logger(), "[Overall] Angle out of range: %d", angle);
       return;
     }
 
-    char buf0 = s[0];
-    int sign = (s[3] == '-') ? -1 : +1;
-    int angle = sign * (((s[4]-'0')*100) + ((s[5]-'0')*10) + (s[6]-'0'));
+    std::array<uint8_t, BUFSIZE> tx{};
+    tx[0] = 0xAA; tx[1] = 0xC6;
+    tx[2] = 0x00; tx[3] = 0x00;
+
+    // 6モジュールに順次送信
+    for (int i = 0; i < 6; ++i) {
+      tx[4] = 'C';
+      tx[5] = char('1' + i);
+      tx[6] = s[2];  // 'p'
+      tx[7] = s[3];  // 符号
+      int a = abs(angle);
+      tx[8] = char((a/60) + '0');
+      tx[9] = char(((a/6) - ((a/60)*10)) + '0');
+      tx[10] = 0x55;
+
+      write(fd_, tx.data(), tx.size());
+      RCLCPP_INFO(this->get_logger(), "[Overall] Sent to module %d: %c%c%02d", i+1, tx[6], tx[7], a);
+      usleep(50000);
+    }
+  }
+
+  // 単体制御(CYp-XXX)を受信した時のコールバック
+  void on_module_command(const std_msgs::msg::String::SharedPtr msg)
+  {
+    const auto &s = msg->data;
+    RCLCPP_INFO(this->get_logger(), "[Module] Received: '%s'", s.c_str());
+
+    if (s.size() < 7 || s[0] != 'C') {
+      RCLCPP_WARN(this->get_logger(), "[Module] Invalid format or prefix: '%s'", s.c_str());
+      return;
+    }
+    int module = s[1] - '0';
+    int sign   = (s[3] == '-') ? -1 : +1;
+    int angle  = sign * (((s[4]-'0')*100) + ((s[5]-'0')*10) + (s[6]-'0'));
+    if (module < 1 || module > 6 || angle < -30 || angle > 30) {
+      RCLCPP_WARN(this->get_logger(), "[Module] Invalid module or angle: mod=%d, ang=%d", module, angle);
+      return;
+    }
 
     std::array<uint8_t, BUFSIZE> tx{};
-    tx[0] = 0xAA;
-    tx[1] = 0xC6;
-    tx[2] = 0x00;
-    tx[3] = 0x00;
+    tx[0] = 0xAA; tx[1] = 0xC6;
+    tx[2] = 0x00; tx[3] = 0x00;
+    tx[4] = 'C';
+    tx[5] = s[1];      // モジュール番号
+    tx[6] = s[2];      // 'p'
+    tx[7] = s[3];      // 符号
+    int a = abs(angle);
+    tx[8] = char((a/10) + '0');
+    tx[9] = char((a%10) + '0');
+    tx[10] = 0x55;
 
-    if (buf0 == 'C' && -30 <= angle && angle <= 30) {
-      // モジュール単体制御コマンドを構築
-      tx[4] = 'C';        // コマンド識別子
-      tx[5] = s[1];       // モジュール番号
-      tx[6] = s[2];       // 'p'
-      tx[7] = s[3];       // 符号
-      int a = abs(angle);
-      tx[8] = char((a/10) + '0');
-      tx[9] = char((a%10) + '0');
-      tx[10] = 0x55;      // 終端
-
-      // シリアルに送信
-      write(fd_, tx.data(), tx.size());
-      RCLCPP_INFO(this->get_logger(), "Sent module command: '%c%c%c%02d'",
-                  tx[5], tx[6], tx[7], a);
-    }
-    else if (buf0 == 'A' && -180 <= angle && angle <= 180) {
-      // 全体制御：6つのモジュールに順次送信
-      for (int i = 0; i < 6; ++i) {
-        tx[4] = 'C';
-        tx[5] = char('1' + i);
-        tx[6] = s[2];
-        tx[7] = s[3];
-        int a = abs(angle);
-        tx[8] = char((a/60) + '0');
-        tx[9] = char(((a/6) - ((a/60)*10)) + '0');
-        tx[10] = 0x55;
-
-        write(fd_, tx.data(), tx.size());
-        RCLCPP_INFO(this->get_logger(), "Sent all-mod #%d: '%c%c%02d'", i+1, s[2], s[3], a);
-        usleep(50000);
-      }
-    }
-    else {
-      RCLCPP_WARN(this->get_logger(), "Angle out of range or bad command: %d", angle);
-    }
+    write(fd_, tx.data(), tx.size());
+    RCLCPP_INFO(this->get_logger(), "[Module] Sent to module %d: %c%c%02d", module, tx[6], tx[7], a);
   }
 
   int fd_;
   struct termios oldtio_;
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_overall_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_module_;
 };
 
 int main(int argc, char **argv)
