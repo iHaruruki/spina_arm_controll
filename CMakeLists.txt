@@ -11,6 +11,26 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
+find_package(YARP REQUIRED)
+find_package(OpenCV REQUIRED)
+
+project(${PROJECT_MAIN})
+
+add_executable(${PROJECT_MAIN}
+	seSe_arm_controll.cpp
+)
+
+
+target_link_libraries(${PROJECT_MAIN}
+	${YARP_LIBRARIES}
+	${OpenCV_LIBS}
+	#${ROBOT_LIBRARY}
+)
+
+install(TARGETS ${PROJECT_MAIN}
+	DESTINATION bin
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
