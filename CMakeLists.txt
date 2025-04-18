@@ -9,20 +9,14 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(YARP REQUIRED)
-find_package(OpenCV REQUIRED)
+find_package(std_msgs REQUIRED)
+#find_package(YARP REQUIRED)
+#find_package(OpenCV REQUIRED)
 
 #project(${PROJECT_MAIN})
 
-add_executable(arm_controll_node
-	src/seSe_arm_controll.cpp
-)
-
-ament_target_dependencies(arm_controll_node
-  rclcpp
-  YARP
-  OpenCV
-)
+add_executable(serial_controller_node src/seSe_arm_controll.cpp)
+ament_target_dependencies(serial_controller_node rclcpp std_msgs)
 
 #target_link_libraries(${PROJECT_MAIN}
 #	${YARP_LIBRARIES}
@@ -31,7 +25,7 @@ ament_target_dependencies(arm_controll_node
 #)
 
 install(TARGETS
-	arm_controll_node
+  serial_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
