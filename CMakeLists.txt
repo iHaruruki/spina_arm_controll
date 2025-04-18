@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
-#project(spina_arm_controll)
-set(PROJECT_MAIN spina_arm_controll)
+project(spina_arm_controll)
+#set(PROJECT_MAIN spina_arm_controll)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -8,28 +8,31 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
-
+find_package(rclcpp REQUIRED)
 find_package(YARP REQUIRED)
 find_package(OpenCV REQUIRED)
 
-project(${PROJECT_MAIN})
+#project(${PROJECT_MAIN})
 
-add_executable(${PROJECT_MAIN}
+add_executable(arm_controll_node
 	src/seSe_arm_controll.cpp
 )
 
-
-target_link_libraries(${PROJECT_MAIN}
-	${YARP_LIBRARIES}
-	${OpenCV_LIBS}
-	#${ROBOT_LIBRARY}
+ament_target_dependencies(arm_controll_node
+  rclcpp
+  YARP
+  OpenCV
 )
 
-install(TARGETS ${PROJECT_MAIN}
-	DESTINATION bin
+#target_link_libraries(${PROJECT_MAIN}
+#	${YARP_LIBRARIES}
+#	${OpenCV_LIBS}
+	#${ROBOT_LIBRARY}
+#)
+
+install(TARGETS
+	arm_controll_node
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
