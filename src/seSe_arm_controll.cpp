@@ -1,108 +1,132 @@
+// src/serial_controller_node.cpp
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/string.hpp>
 
-//A0p-XXX(Xは総合角度)で全体の角度を変更
-//CYp-XXX(Yはモジュール番号)でモジュール単体の角度を変更
-
-/////////////////////////////////////////////////////////
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/wait.h>
-#include <iostream>
-using namespace std;
+#include <array>
+
 #define SERIAL_PORT "/dev/ttyUSB0"
-#define BAUDRATE 2000000
-#define BUFSIZE 100
+#define BAUDRATE B2000000
+#define BUFSIZE 11  // 送信バッファサイズ
 
-int main(int argc, char *argv[]){
+class SerialController : public rclcpp::Node
+{
+public:
+  SerialController()
+  : Node("serial_controller")
+  {
+    // --- シリアルポートをオープン ---
+    fd_ = open(SERIAL_PORT, O_RDWR | O_NOCTTY);
+    if (fd_ < 0) {
+      RCLCPP_FATAL(this->get_logger(), "Failed to open %s", SERIAL_PORT);
+      throw std::runtime_error("serial open failed");
+    }
 
-        unsigned char txData[BUFSIZE]={};
-	unsigned char txData_r[BUFSIZE]={};
-        int fd;
+    // --- 既存のターミナル設定を保持 ---
+    tcgetattr(fd_, &oldtio_);
 
-        struct termios oldtio, newtio;
-        
-        fd = open(SERIAL_PORT, O_RDWR);
-        
-        if(fd < 0){
-                printf("open error");
-        }
-        cout << "fd:" << fd << endl;
-		
-	ioctl(fd, TCGETS, &oldtio);
-	newtio.c_cflag = BAUDRATE | CS8 | CREAD;
-	tcsetattr(fd, TCSANOW, &newtio);
-	ioctl(fd, TCSETS, &newtio);
-			
-        printf("\n\rstart\n\r\n\r");
-        
-        while(1) {
-        	char buf[9]; // バッファ
-        	char send[11];         //コマンドを保存する配列
-        	
-		for(int i=0;i<8;i++)scanf("%c",&buf[i]);	
-	    	printf("Received command:");
-	    	for(int i=0;i<7;i++)printf("%c",buf[i]);
-	    	printf("\n\r");
-	    	
-	    	int angle=((buf[4]-'0')*100) + ((buf[5]-'0')*10) + (buf[6]-'0');
-	    	//if(buf[3]=='+')angle=angle;
-	    	//else if(buf[3]=='-')angle=-angle;
-	    	//else angle=1000;
-	    	
-	    	if(buf[0]=='C' && -30<=angle && angle<=30){
-	    	
-		    	send[0] = 0xAA;
-			send[1] = 0xC6;
-			send[2] = 0x00;
-			send[3] = 0x00;
-	    		send[4]='C';
-    			send[5]=buf[1];
-    			send[6]=buf[2];
-    			send[7]=buf[3];
-    			send[8]=(angle/10)+'0';
-    			send[9]=angle-((angle/10)*10)+'0';
-    			send[10] = 0x55;
-    			
-    			write(fd, send, sizeof(send));  //保存したコマンドを送信
-    			usleep(1.0*50000);
-    			
-    			printf("send:");             //送信確認
-			for(int i=4;i<10;i++)printf("%c",send[i]);
-			printf(" length:%d\n\r",sizeof(send));
-	    	}
-	    	
-	    	else if(buf[0]=='A' && -180<=angle && angle<=180){
-	    		for(int i=0;i<6;i++){
-	    			
-	    			send[0] = 0xAA;
-				send[1] = 0xC6;
-				send[2] = 0x00;
-				send[3] = 0x00;
-	    			send[4]='C';
-	    			send[5]=i+1+'0';
-	    			send[6]=buf[2];
-	    			send[7]=buf[3];
-	    			send[8]=(angle/60)+'0';
-	    			send[9]=(angle/6-((angle/60)*10))+'0';
-	    			send[10] = 0x55;
-	    			
-	    			write(fd, send, sizeof(send));  //保存したコマンドを送信
-				usleep(1.0*50000);
-				printf("send:");             //送信確認
-				for(int i=4;i<10;i++)printf("%c",send[i]);
-				printf(" length:%d\n\r",sizeof(send));
-    			}
-	    	}
-	    	
-	    	else printf("Invalid value!\n\r");
-	    	printf("\n\r");
-        }
-        ioctl(fd, TCSETS, &oldtio);
-        close(fd);
+    // --- シリアルポート設定 ---
+    struct termios tio{};
+    cfsetispeed(&tio, BAUDRATE);
+    cfsetospeed(&tio, BAUDRATE);
+    tio.c_cflag = CS8 | CREAD | CLOCAL;
+    tio.c_iflag = 0;
+    tio.c_oflag = 0;
+    tio.c_lflag = 0;
+    tcflush(fd_, TCIFLUSH);
+    tcsetattr(fd_, TCSANOW, &tio);
+
+    // --- トピック購読者を作成 ---
+    sub_ = this->create_subscription<std_msgs::msg::String>(
+      "angle_commands", 10,
+      std::bind(&SerialController::on_command, this, std::placeholders::_1));
+
+    // 購読成功をログに出力
+    RCLCPP_INFO(this->get_logger(), "Subscribed to 'angle_commands' successfully.");
+    RCLCPP_INFO(this->get_logger(), "SerialController node started");
+  }
+
+  ~SerialController()
+  {
+    // ノード終了時に元のターミナル設定に戻す
+    tcsetattr(fd_, TCSANOW, &oldtio_);
+    close(fd_);
+    RCLCPP_INFO(this->get_logger(), "SerialController node shut down, serial port closed.");
+  }
+
+private:
+  void on_command(const std_msgs::msg::String::SharedPtr msg)
+  {
+    const auto &s = msg->data;
+    // 受信データをログに表示
+    RCLCPP_INFO(this->get_logger(), "Received topic data: '%s'", s.c_str());
+
+    if (s.size() < 7) {
+      RCLCPP_WARN(this->get_logger(), "Invalid command length: '%s'", s.c_str());
+      return;
+    }
+
+    char buf0 = s[0];
+    int sign = (s[3] == '-') ? -1 : +1;
+    int angle = sign * (((s[4]-'0')*100) + ((s[5]-'0')*10) + (s[6]-'0'));
+
+    std::array<uint8_t, BUFSIZE> tx{};
+    tx[0] = 0xAA;
+    tx[1] = 0xC6;
+    tx[2] = 0x00;
+    tx[3] = 0x00;
+
+    if (buf0 == 'C' && -30 <= angle && angle <= 30) {
+      // モジュール単体制御コマンドを構築
+      tx[4] = 'C';        // コマンド識別子
+      tx[5] = s[1];       // モジュール番号
+      tx[6] = s[2];       // 'p'
+      tx[7] = s[3];       // 符号
+      int a = abs(angle);
+      tx[8] = char((a/10) + '0');
+      tx[9] = char((a%10) + '0');
+      tx[10] = 0x55;      // 終端
+
+      // シリアルに送信
+      write(fd_, tx.data(), tx.size());
+      RCLCPP_INFO(this->get_logger(), "Sent module command: '%c%c%c%02d'",
+                  tx[5], tx[6], tx[7], a);
+    }
+    else if (buf0 == 'A' && -180 <= angle && angle <= 180) {
+      // 全体制御：6つのモジュールに順次送信
+      for (int i = 0; i < 6; ++i) {
+        tx[4] = 'C';
+        tx[5] = char('1' + i);
+        tx[6] = s[2];
+        tx[7] = s[3];
+        int a = abs(angle);
+        tx[8] = char((a/60) + '0');
+        tx[9] = char(((a/6) - ((a/60)*10)) + '0');
+        tx[10] = 0x55;
+
+        write(fd_, tx.data(), tx.size());
+        RCLCPP_INFO(this->get_logger(), "Sent all-mod #%d: '%c%c%02d'", i+1, s[2], s[3], a);
+        usleep(50000);
+      }
+    }
+    else {
+      RCLCPP_WARN(this->get_logger(), "Angle out of range or bad command: %d", angle);
+    }
+  }
+
+  int fd_;
+  struct termios oldtio_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_;
+};
+
+int main(int argc, char **argv)
+{
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<SerialController>();
+  rclcpp::spin(node);
+  rclcpp::shutdown();
+  return 0;
 }
-
