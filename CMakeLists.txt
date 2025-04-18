@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
-project(spina_arm_controll)
+#project(spina_arm_controll)
+set(PROJECT_MAIN spina_arm_controll)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -17,7 +18,7 @@ find_package(OpenCV REQUIRED)
 project(${PROJECT_MAIN})
 
 add_executable(${PROJECT_MAIN}
-	seSe_arm_controll.cpp
+	src/seSe_arm_controll.cpp
 )
 
 
