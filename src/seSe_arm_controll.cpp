@@ -54,37 +54,48 @@ private:
       return;
     }
 
-    // 受信コマンド例: "A0p-030" や "C1y015"
     int angle = ((buf[4]-'0')*100) + ((buf[5]-'0')*10) + (buf[6]-'0');
-    unsigned char send[11] = {0xAA, 0xC6, 0x00, 0x00};
+    char send[11];
 
     if (buf[0]=='C' && -30 <= angle && angle <= 30) {
       // モジュール単体制御
+      send[0] = 0xAA;
+			send[1] = 0xC6;
+			send[2] = 0x00;
+			send[3] = 0x00;
       send[4] = 'C';
       send[5] = buf[1];
       send[6] = buf[2];
       send[7] = buf[3];
       send[8] = (angle/10) + '0';
-      send[9] = (angle%10) + '0';
+      send[9] = angle - ((angle/10) * 10) + '0';
       send[10] = 0x55;
       write(fd_, send, sizeof(send));
-      RCLCPP_INFO(this->get_logger(), "Sent C command: %s", buf.c_str());
+      RCLCPP_INFO(this->get_logger(), "Sent command: %s", buf.c_str());
 
-    } else if (buf[0]=='A' && -180 <= angle && angle <= 180) {
+    }
+
+    else if (buf[0]=='A' && -180 <= angle && angle <= 180) {
       // 全体角度制御
       for (int i = 0; i < 6; i++) {
+        send[0] = 0xAA;
+			  send[1] = 0xC6;
+			  send[2] = 0x00;
+			  send[3] = 0x00;
         send[4] = 'C';
-        send[5] = '1' + i;       // モジュール番号
+        send[5] = i+1+'0';  // モジュール番号
         send[6] = buf[2];
         send[7] = buf[3];
         send[8] = (angle/60) + '0';
-        send[9] = ((angle/6)%10) + '0';
+        send[9] = (angle/6 - ((angle/60) * 10)) + '0';
         send[10] = 0x55;
         write(fd_, send, sizeof(send));
-        RCLCPP_INFO(this->get_logger(), "Sent A command to module %d: %s", i+1, buf.c_str());
+        RCLCPP_INFO(this->get_logger(), "Sent command to module %d: %s", i+1, buf.c_str());
         usleep(50000);
       }
-    } else {
+    }
+
+    else {
       RCLCPP_WARN(this->get_logger(), "Invalid value or out of range: %s", buf.c_str());
     }
   }
