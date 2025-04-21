@@ -27,7 +27,7 @@ Overall Control
 * A: 全体制御
 * 0: サブプレースホルダ
 * p: 区切り文字
-* -090: -90度
+* -090: -90度<br>
 Module Individual Control
 * C: モジュール制御
 * 1: モジュール番号（1-6）
