@@ -1,151 +1,106 @@
-// src/serial_controller_node.cpp
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
 
-#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
-#include <array>
 
-#define SERIAL_PORT "/dev/ttyUSB0"
-#define BAUDRATE B2000000
-#define BUFSIZE 11  // 送信バッファサイズ
+using namespace std::chrono_literals;
 
-class SerialController : public rclcpp::Node
+class ArmController : public rclcpp::Node
 {
 public:
-  SerialController()
-  : Node("serial_controller")
+  ArmController()
+  : Node("arm_controller")
   {
-    // --- シリアルポートをオープン ---
-    fd_ = open(SERIAL_PORT, O_RDWR | O_NOCTTY);
+    // シリアルポートをオープン
+    fd_ = open(SERIAL_PORT, O_RDWR);
     if (fd_ < 0) {
       RCLCPP_FATAL(this->get_logger(), "Failed to open %s", SERIAL_PORT);
-      throw std::runtime_error("serial open failed");
+      rclcpp::shutdown();
+      return;
     }
+    // 通信設定
+    struct termios newtio;
+    ioctl(fd_, TCGETS, &oldtio_);
+    newtio.c_cflag = BAUDRATE | CS8 | CREAD;
+    tcsetattr(fd_, TCSANOW, &newtio);
+    ioctl(fd_, TCSETS, &newtio);
 
-    // --- 既存のターミナル設定を保持 ---
-    tcgetattr(fd_, &oldtio_);
+    // トピック購読
+    sub_ = this->create_subscription<std_msgs::msg::String>(
+      "angle_cmd", 10,
+      std::bind(&ArmController::cmdCallback, this, std::placeholders::_1));
 
-    // --- シリアルポート設定 ---
-    struct termios tio{};
-    cfsetispeed(&tio, BAUDRATE);
-    cfsetospeed(&tio, BAUDRATE);
-    tio.c_cflag = CS8 | CREAD | CLOCAL;
-    tio.c_iflag = 0;
-    tio.c_oflag = 0;
-    tio.c_lflag = 0;
-    tcflush(fd_, TCIFLUSH);
-    tcsetattr(fd_, TCSANOW, &tio);
-
-    // --- サブスクライバー (全体制御用) ---
-    sub_overall_ = this->create_subscription<std_msgs::msg::String>(
-      "overall_angle", 10,
-      std::bind(&SerialController::on_overall_command, this, std::placeholders::_1));
-    RCLCPP_INFO(this->get_logger(), "Subscribed to 'overall_angle' successfully.");
-
-    // --- サブスクライバー (モジュール単体制御用) ---
-    sub_module_ = this->create_subscription<std_msgs::msg::String>(
-      "module_angle", 10,
-      std::bind(&SerialController::on_module_command, this, std::placeholders::_1));
-    RCLCPP_INFO(this->get_logger(), "Subscribed to 'module_angle' successfully.");
-
-    RCLCPP_INFO(this->get_logger(), "SerialController node started");
+    RCLCPP_INFO(this->get_logger(), "ArmController node started");
   }
 
-  ~SerialController()
+  ~ArmController()
   {
-    // ノード終了時に元のターミナル設定に戻す
-    tcsetattr(fd_, TCSANOW, &oldtio_);
+    // シリアル設定を元に戻してクローズ
+    ioctl(fd_, TCSETS, &oldtio_);
     close(fd_);
-    RCLCPP_INFO(this->get_logger(), "SerialController node shut down, serial port closed.");
   }
 
 private:
-  // 全体制御(A0p-XXX)を受信した時のコールバック
-  void on_overall_command(const std_msgs::msg::String::SharedPtr msg)
+  void cmdCallback(const std_msgs::msg::String::SharedPtr msg)
   {
-    const auto &s = msg->data;
-    RCLCPP_INFO(this->get_logger(), "[Overall] Received: '%s'", s.c_str());
-
-    if (s.size() < 7 || s[0] != 'A') {
-      RCLCPP_WARN(this->get_logger(), "[Overall] Invalid format or prefix: '%s'", s.c_str());
-      return;
-    }
-    int sign = (s[3] == '-') ? -1 : +1;
-    int angle = sign * (((s[4]-'0')*100) + ((s[5]-'0')*10) + (s[6]-'0'));
-    if (angle < -180 || angle > 180) {
-      RCLCPP_WARN(this->get_logger(), "[Overall] Angle out of range: %d", angle);
+    const std::string &buf = msg->data;
+    if (buf.size() < 7) {
+      RCLCPP_WARN(this->get_logger(), "Invalid command length");
       return;
     }
 
-    std::array<uint8_t, BUFSIZE> tx{};
-    tx[0] = 0xAA; tx[1] = 0xC6;
-    tx[2] = 0x00; tx[3] = 0x00;
+    // 受信コマンド例: "A0p-030" や "C1y015"
+    int angle = ((buf[4]-'0')*100) + ((buf[5]-'0')*10) + (buf[6]-'0');
+    unsigned char send[11] = {0xAA, 0xC6, 0x00, 0x00};
 
-    // 6モジュールに順次送信
-    for (int i = 0; i < 6; ++i) {
-      tx[4] = 'C';
-      tx[5] = char('1' + i);
-      tx[6] = s[2];  // 'p'
-      tx[7] = s[3];  // 符号
-      int a = abs(angle);
-      tx[8] = char((a/60) + '0');
-      tx[9] = char(((a/6) - ((a/60)*10)) + '0');
-      tx[10] = 0x55;
+    if (buf[0]=='C' && -30 <= angle && angle <= 30) {
+      // モジュール単体制御
+      send[4] = 'C';
+      send[5] = buf[1];
+      send[6] = buf[2];
+      send[7] = buf[3];
+      send[8] = (angle/10) + '0';
+      send[9] = (angle%10) + '0';
+      send[10] = 0x55;
+      write(fd_, send, sizeof(send));
+      RCLCPP_INFO(this->get_logger(), "Sent C command: %s", buf.c_str());
 
-      write(fd_, tx.data(), tx.size());
-      RCLCPP_INFO(this->get_logger(), "[Overall] Sent to module %d: %c%c%02d", i+1, tx[6], tx[7], a);
-      usleep(50000);
+    } else if (buf[0]=='A' && -180 <= angle && angle <= 180) {
+      // 全体角度制御
+      for (int i = 0; i < 6; i++) {
+        send[4] = 'C';
+        send[5] = '1' + i;       // モジュール番号
+        send[6] = buf[2];
+        send[7] = buf[3];
+        send[8] = (angle/60) + '0';
+        send[9] = ((angle/6)%10) + '0';
+        send[10] = 0x55;
+        write(fd_, send, sizeof(send));
+        RCLCPP_INFO(this->get_logger(), "Sent A command to module %d: %s", i+1, buf.c_str());
+        usleep(50000);
+      }
+    } else {
+      RCLCPP_WARN(this->get_logger(), "Invalid value or out of range: %s", buf.c_str());
     }
   }
 
-  // 単体制御(CYp-XXX)を受信した時のコールバック
-  void on_module_command(const std_msgs::msg::String::SharedPtr msg)
-  {
-    const auto &s = msg->data;
-    RCLCPP_INFO(this->get_logger(), "[Module] Received: '%s'", s.c_str());
-
-    if (s.size() < 7 || s[0] != 'C') {
-      RCLCPP_WARN(this->get_logger(), "[Module] Invalid format or prefix: '%s'", s.c_str());
-      return;
-    }
-    int module = s[1] - '0';
-    int sign   = (s[3] == '-') ? -1 : +1;
-    int angle  = sign * (((s[4]-'0')*100) + ((s[5]-'0')*10) + (s[6]-'0'));
-    if (module < 1 || module > 6 || angle < -30 || angle > 30) {
-      RCLCPP_WARN(this->get_logger(), "[Module] Invalid module or angle: mod=%d, ang=%d", module, angle);
-      return;
-    }
-
-    std::array<uint8_t, BUFSIZE> tx{};
-    tx[0] = 0xAA; tx[1] = 0xC6;
-    tx[2] = 0x00; tx[3] = 0x00;
-    tx[4] = 'C';
-    tx[5] = s[1];      // モジュール番号
-    tx[6] = s[2];      // 'p'
-    tx[7] = s[3];      // 符号
-    int a = abs(angle);
-    tx[8] = char((a/10) + '0');
-    tx[9] = char((a%10) + '0');
-    tx[10] = 0x55;
-
-    write(fd_, tx.data(), tx.size());
-    RCLCPP_INFO(this->get_logger(), "[Module] Sent to module %d: %c%c%02d", module, tx[6], tx[7], a);
-  }
-
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_;
   int fd_;
   struct termios oldtio_;
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_overall_;
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_module_;
+
+  static constexpr const char* SERIAL_PORT = "/dev/ttyUSB0";
+  static constexpr int BAUDRATE = B2000000;
 };
 
-int main(int argc, char **argv)
+int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<SerialController>();
-  rclcpp::spin(node);
+  rclcpp::spin(std::make_shared<ArmController>());
   rclcpp::shutdown();
   return 0;
 }
