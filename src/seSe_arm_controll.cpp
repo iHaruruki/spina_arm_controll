@@ -18,11 +18,11 @@ public:
   {
     // シリアルポートをオープン
     fd_ = open(SERIAL_PORT, O_RDWR);
-    if (fd_ < 0) {
+    /*if (fd_ < 0) {
       RCLCPP_FATAL(this->get_logger(), "Failed to open %s", SERIAL_PORT);
       rclcpp::shutdown();
       return;
-    }
+    }*/
     // 通信設定
     struct termios newtio;
     ioctl(fd_, TCGETS, &oldtio_);
