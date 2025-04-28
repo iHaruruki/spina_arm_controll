@@ -1,6 +1,6 @@
 # spina_arm_controll
 ### Node and Topic
-![](picture/rosgraph.png)
+![](rosgraph.png)
 ## Dependency
 ```
 ```
