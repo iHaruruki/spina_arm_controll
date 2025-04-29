@@ -47,5 +47,13 @@
         "/opt/ros/humble/lib/python3.10/site-packages",
         "/opt/ros/humble/local/lib/python3.10/dist-packages"
     ],
-    "ros.distro": "humble"
+    "ros.distro": "humble",
+    "files.associations": {
+        "*.ipp": "cpp",
+        "array": "cpp",
+        "string": "cpp",
+        "string_view": "cpp",
+        "ranges": "cpp",
+        "span": "cpp"
+    }
 }

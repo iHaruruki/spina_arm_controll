@@ -14,6 +14,7 @@ $ source install/setup.bash
 ```
 ## Usage
 ```
+$ sudo chmod 777 /dev/ttyUSB0
 $ ros2 run spina_arm_controll serial_controller_node
 
 ```
