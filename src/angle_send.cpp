@@ -27,7 +27,7 @@ public:
 
     // 1秒ごとに publish_angle() を呼ぶタイマー
     timer_ = this->create_wall_timer(
-      1s, std::bind(&AngleSendNode::publish_angle, this));
+      2s, std::bind(&AngleSendNode::publish_angle, this));
   }
 
 private:
