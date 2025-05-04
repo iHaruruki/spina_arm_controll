@@ -12,6 +12,8 @@
 #define angle_m4 -20
 #define angle_m5 -25
 #define angle_m6 -30
+// publish_angle() を呼ぶタイマーの周期(s)
+#define period 2
 
 using namespace std::chrono_literals;
 
@@ -21,13 +23,12 @@ public:
   AngleSendNode()
   : Node("angle_send_node"),
     id_(1),
-    angles_{ angle_m1, angle_m2, angle_m3, angle_m4, angle_m5, angle_m6 }  // m1…m6 の角度
+    angles_{ angle_m1, angle_m2, angle_m3, angle_m4, angle_m5, angle_m6 }  // m1-m6 の角度
   {
     pub_ = this->create_publisher<std_msgs::msg::String>("angle_cmd", 1);
 
-    // 1秒ごとに publish_angle() を呼ぶタイマー
     timer_ = this->create_wall_timer(
-      2s, std::bind(&AngleSendNode::publish_angle, this));
+      std::chrono::seconds(period), std::bind(&AngleSendNode::publish_angle, this));
   }
 
 private:
@@ -39,7 +40,6 @@ private:
       return;
     }
 
-    // 例: "C1p010" / "C2p-010" のように 3 桁ゼロ埋めにしたい場合
     std::ostringstream ss;
     ss << 'C' << id_
        << 'p'
