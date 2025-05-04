@@ -18,7 +18,7 @@ $ sudo chmod 777 /dev/ttyUSB0
 $ ros2 run spina_arm_controll serial_controller_node
 
 ```
-### Sending angle command
+### Sending angle command with command line interface tools
 ```
 # Set the overall angle to -90°
 $ ros2 topic pub /angle_cmd std_msgs/msg/String "{ data: 'A0p-090' }" --once
@@ -37,6 +37,10 @@ Module Individual Control
 * 1: モジュール番号（1-6）
 * p: 区切り文字
 * -015: -15度
+### Sending angle command with Node
+```
+$ ros2 run spina_arm_controll angle_send_node
+```
 ## License
 ## Authors
 ## References
