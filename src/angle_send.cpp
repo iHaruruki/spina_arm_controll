@@ -6,12 +6,12 @@
 #include <chrono>
 
 // 各モジュールの角度を設定(-30~30)
-#define angle_m1 -10
-#define angle_m2 -15
-#define angle_m3 -25
-#define angle_m4 -25
+#define angle_m1 20
+#define angle_m2 20
+#define angle_m3 0
+#define angle_m4 -20
 #define angle_m5 -25
-#define angle_m6 -25
+#define angle_m6 -30
 
 using namespace std::chrono_literals;
 
