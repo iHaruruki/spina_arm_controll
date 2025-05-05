@@ -8,12 +8,12 @@
 #include <chrono>
 
 // 各モジュールの姿勢の軸設定
-#define posture_m1 p
-#define posture_m2 p
-#define posture_m3 p
-#define posture_m4 p
-#define posture_m5 p
-#define posture_m6 p
+#define posture_m1 'p'
+#define posture_m2 'p'
+#define posture_m3 'p'
+#define posture_m4 'p'
+#define posture_m5 'p'
+#define posture_m6 'p'
 
 // 各モジュールの角度を設定(-30~30)
 #define angle_m1 20
@@ -33,19 +33,9 @@ public:
     AngleSendNode()
     : Node("angle_send_node"),
       id_(1),
-      angles_{ angle_m1, angle_m2, angle_m3, angle_m4, angle_m5, angle_m6 }
+      angles_{ angle_m1, angle_m2, angle_m3, angle_m4, angle_m5, angle_m6 },
+      axes_{ posture_m1, posture_m2, posture_m3, posture_m4, posture_m5, posture_m6 }
     {
-        // パラメータ "axes" を宣言（6個分。デフォルトはすべて "p"）
-        auto default_axes = std::vector<std::string>(6, "p");
-        std::vector<std::string> axes_param = this->declare_parameter("axes", default_axes);
-
-        for (size_t i = 0; i < 6; i++) {
-            if (i < axes_param.size() && !axes_param[i].empty())
-                axes_[i] = axes_param[i][0];
-            else
-                axes_[i] = 'p';
-        }
-
         pub_ = this->create_publisher<std_msgs::msg::String>("angle_cmd", 1);
 
         timer_ = this->create_wall_timer(
