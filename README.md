@@ -29,13 +29,13 @@ $ ros2 topic pub /angle_cmd std_msgs/msg/String "{ data: 'C1p-030' }" --once
 Overall Control
 * A: 全体制御
 * 0: サブプレースホルダ
-* p: 区切り文字
+* p: 姿勢の軸設定(p:Pitch, r:Roll)
 * -090: -90度<br>
 
 Module Individual Control
 * C: モジュール制御
 * 1: モジュール番号（1-6）
-* p: 区切り文字
+* p: 姿勢の軸設定(p:Pitch, r:Roll)
 * -015: -15度
 ### Sending angle command with Node
 ```
