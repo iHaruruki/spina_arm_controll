@@ -7,13 +7,13 @@
 #include <sstream>
 #include <chrono>
 
-// 各モジュールの姿勢の軸設定
+// 各モジュールの姿勢の軸設定('p' or 'r')
 #define posture_m1 'p'
 #define posture_m2 'p'
 #define posture_m3 'p'
-#define posture_m4 'p'
-#define posture_m5 'p'
-#define posture_m6 'p'
+#define posture_m4 'r'
+#define posture_m5 'r'
+#define posture_m6 'r'
 
 // 各モジュールの角度を設定(-30~30)
 #define angle_m1 20
@@ -23,7 +23,7 @@
 #define angle_m5 -25
 #define angle_m6 -30
 // publish_angle() を呼ぶタイマーの周期(s)
-#define period 2
+#define period 1
 
 using namespace std::chrono_literals;
 
