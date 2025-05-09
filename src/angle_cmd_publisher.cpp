@@ -12,10 +12,14 @@ class AngleCmdPublisher : public rclcpp::Node
 public:
     AngleCmdPublisher()
         : Node("angle_cmd_publisher"), messages_(
-            {"C3p-020", "C4p-020", "C5p-020", "C3r+020", "C4r+020", "C5r+020", "C3p+020", "C4p+020", "C5p+020", "C3r-020", "C4r-020", "C5r-020",}), current_index_(0)
+            {   "C2p-020", "C3p-020", "C4p-020", "C5p-020", "A0p-000", "A0r-000"
+                "C2r+020", "C3r+020", "C4r+020", "C5r+020", "A0p-000", "A0r-000"
+                "C2p+020", "C3p+020", "C4p+020", "C5p+020", "A0p-000", "A0r-000"
+                "C2r-020", "C3r-020", "C4r-020", "C5r-020", "A0p-000", "A0r-000"
+            }), current_index_(0)
     {
         publisher_ = this->create_publisher<std_msgs::msg::String>("/angle_cmd", 10);
-        timer_ = this->create_wall_timer(1.5s, std::bind(&AngleCmdPublisher::publish_message, this));
+        timer_ = this->create_wall_timer(2s, std::bind(&AngleCmdPublisher::publish_message, this));
     }
 
 private:
