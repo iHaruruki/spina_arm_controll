@@ -21,6 +21,9 @@ ament_target_dependencies(serial_controller_node rclcpp std_msgs)
 add_executable(angle_send_node src/angle_send.cpp)
 ament_target_dependencies(angle_send_node rclcpp std_msgs)
 
+add_executable(angle_cmd_publisher_node src/angle_cmd_publisher.cpp)
+ament_target_dependencies(angle_cmd_publisher_node rclcpp std_msgs)
+
 #target_link_libraries(${PROJECT_MAIN}
 #	${YARP_LIBRARIES}
 #	${OpenCV_LIBS}
@@ -30,6 +33,7 @@ ament_target_dependencies(angle_send_node rclcpp std_msgs)
 install(TARGETS
   serial_controller_node
   angle_send_node
+  angle_cmd_publisher_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
