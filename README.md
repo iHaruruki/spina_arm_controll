@@ -29,14 +29,14 @@ $ ros2 topic pub /angle_cmd std_msgs/msg/String "{ data: 'C1p-030' }" --once
 Overall Control
 * A: 全体制御
 * 0: サブプレースホルダ
-* p: 姿勢の軸設定(p:Pitch, r:Roll)
+* p: 姿勢の軸設定(p:Pitch, r:Yaw)
 * -090: -90度<br>
 
 Module Individual Control
 * C: モジュール制御
 * 1: モジュール番号（1-6）
-* p: 姿勢の軸設定(p:Pitch, r:Roll)
-* -015: -15度
+* p: 姿勢の軸設定(p:Pitch, r:Yaw)
+* -015: -15度<br>
 ### Sending angle command with Node
 ```
 $ ros2 run spina_arm_controll angle_send_node
