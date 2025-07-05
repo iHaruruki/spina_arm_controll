@@ -104,7 +104,7 @@ private:
   int fd_;
   struct termios oldtio_;
 
-  static constexpr const char* SERIAL_PORT = "/dev/ttyUSB0";
+  static constexpr const char* SERIAL_PORT = "/dev/ttyUSB1";
   static constexpr int BAUDRATE = B2000000;
 };
 

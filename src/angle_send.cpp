@@ -8,20 +8,20 @@
 #include <chrono>
 
 // 各モジュールの姿勢の軸設定('p' or 'r')
-#define posture_m1 'p'
-#define posture_m2 'p'
-#define posture_m3 'p'
+#define posture_m1 'r'
+#define posture_m2 'r'
+#define posture_m3 'r'
 #define posture_m4 'r'
 #define posture_m5 'r'
 #define posture_m6 'r'
 
 // 各モジュールの角度を設定(-30~30)
-#define angle_m1 20
-#define angle_m2 20
-#define angle_m3 0
+#define angle_m1 -10
+#define angle_m2 -10
+#define angle_m3 -10
 #define angle_m4 -20
-#define angle_m5 -25
-#define angle_m6 -30
+#define angle_m5 -20
+#define angle_m6 -20
 // publish_angle() を呼ぶタイマーの周期(s)
 #define period 1
 
