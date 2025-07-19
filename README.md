@@ -39,4 +39,5 @@ $ ros2 run spina_arm_controll angle_send_node
 ```
 ## License
 ## Authors
+![Haruki Isono](https://github.com/iHaruruki)
 ## References
