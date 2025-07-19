@@ -1,9 +1,6 @@
 # spina_arm_controll
 ### Node and Topic
 ![](rosgraph.png)
-## Dependency
-```
-```
 ## Setup
 ```
 $ cd ~/ros2_ws/src  #Go to ros workspace
