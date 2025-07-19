@@ -16,7 +16,6 @@ $ source install/setup.bash
 ```
 $ sudo chmod 777 /dev/ttyUSB0
 $ ros2 run spina_arm_controll serial_controller_node
-
 ```
 ### Sending angle command with command line interface tools
 ```
