@@ -35,8 +35,14 @@ Module Individual Control
 * -015: -15度<br>
 ### Sending angle command with Node
 ```
-$ ros2 run spina_arm_controll angle_send_node
+$ ros2 run spina_arm_controll angle_send_node --ros-args -p modules:="['r-15','p+10','r0','p5','r-20','p+30']"
 ```
+- m1 → r-15 （ヨー軸 –15°）
+- m2 → p+10 （ピッチ軸 ＋10°）
+- m3 → r0 （ヨー軸 0°）
+- m4 → p5 （ピッチ軸 ＋5°）
+- m5 → r-20 （ヨー軸 –20°）
+- m6 → p+30 （ピッチ軸 ＋30°）
 ## License
 ## Authors
 ![Haruki Isono](https://github.com/iHaruruki)
