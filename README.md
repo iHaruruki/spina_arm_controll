@@ -24,7 +24,7 @@ $ ros2 topic pub /angle_cmd std_msgs/msg/String "{ data: 'A0p-090' }" --once
 # If you want to control a single module, use "{ data: 'C1p+015' }".
 $ ros2 topic pub /angle_cmd std_msgs/msg/String "{ data: 'C1p-030' }" --once
 ```
-**Details of sending angle command**
+**Details of sending angle command**    
 Overall Control
 * A: 全体制御
 * 0: サブプレースホルダ
