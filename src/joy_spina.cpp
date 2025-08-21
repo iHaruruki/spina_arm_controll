@@ -44,7 +44,7 @@ private:
     {
         // axes[7]の配列外参照を防ぐ
         if (msg->axes.size() > 7 && msg->axes[7] == 1) {
-            up_down_++;
+            up_down_ = up_down_ + 5;
             std::string str = format_signed3("A0p", up_down_);
             //RCLCPP_INFO(this->get_logger(), "%s", str.c_str());
             std_msgs::msg::String out_msg;
@@ -52,7 +52,7 @@ private:
             pub_->publish(out_msg);
         }
         else if(msg->axes.size() > 7 && msg->axes[7] == -1) {
-            up_down_--;
+            up_down_ = up_down_ - 5;
             std::string str = format_signed3("A0p", up_down_);
             //RCLCPP_INFO(this->get_logger(), "%s", str.c_str());
             std_msgs::msg::String out_msg;
@@ -61,7 +61,7 @@ private:
         }
 
         if (msg->axes.size() > 7 && msg->axes[6] == 1) {
-            right_left_++;
+            right_left_ = right_left_ + 5;
             std::string str = format_signed3("A0r", right_left_);
             //RCLCPP_INFO(this->get_logger(), "%s", str.c_str());
             std_msgs::msg::String out_msg;
@@ -69,7 +69,7 @@ private:
             pub_->publish(out_msg);
         }
         else if (msg->axes.size() > 7 && msg->axes[6] == -1) {
-            right_left_--;
+            right_left_ = right_left_ - 5;
             std::string str = format_signed3("A0r", right_left_);
             //RCLCPP_INFO(this->get_logger(), "%s", str.c_str());
             std_msgs::msg::String out_msg;
