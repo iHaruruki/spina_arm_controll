@@ -10,10 +10,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
-#find_package(YARP REQUIRED)
-#find_package(OpenCV REQUIRED)
-
-#project(${PROJECT_MAIN})
+find_package(sensor_msgs REQUIRED)
 
 add_executable(serial_controller_node src/seSe_arm_controll.cpp)
 ament_target_dependencies(serial_controller_node rclcpp std_msgs)
@@ -24,16 +21,14 @@ ament_target_dependencies(angle_send_node rclcpp std_msgs)
 add_executable(angle_cmd_publisher_node src/angle_cmd_publisher.cpp)
 ament_target_dependencies(angle_cmd_publisher_node rclcpp std_msgs)
 
-#target_link_libraries(${PROJECT_MAIN}
-#	${YARP_LIBRARIES}
-#	${OpenCV_LIBS}
-	#${ROBOT_LIBRARY}
-#)
+add_executable(joy_spina_node src/joy_spina.cpp)
+ament_target_dependencies(joy_spina_node rclcpp sensor_msgs)
 
 install(TARGETS
   serial_controller_node
   angle_send_node
   angle_cmd_publisher_node
+  joy_spina_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
