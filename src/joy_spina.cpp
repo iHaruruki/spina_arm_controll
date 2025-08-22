@@ -32,11 +32,9 @@ private:
     std::string format_signed3(const std::string& prefix, int value)
     {
         std::ostringstream ss;
-        if (value < 0) {
-            ss << prefix << "-" << std::setw(3) << std::setfill('0') << std::abs(value);
-        } else {
-            ss << prefix << std::setw(3) << std::setfill('0') << value;
-        }
+        ss << prefix
+        << (value < 0 ? '-' : '+')
+        << std::setw(3) << std::setfill('0') << std::abs(value);
         return ss.str();
     }
 
