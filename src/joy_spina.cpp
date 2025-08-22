@@ -1,14 +1,10 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <sensor_msgs/msg/joy.hpp>
-#include <array>
-#include <vector>
 #include <string>
 #include <iomanip>
 #include <sstream>
 #include <chrono>
-#include <cstdlib> // abs
-
 using namespace std::chrono_literals;
 
 class AngleSendNode : public rclcpp::Node
@@ -16,38 +12,43 @@ class AngleSendNode : public rclcpp::Node
 public:
     AngleSendNode()
     : Node("angle_send_node"),
-      up_down_(0),
-      right_left_(0)
+      up_down_(0), right_left_(0)
     {
-        // パラメータ宣言（起動時に --ros-args -p で上書き可能）
-        publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 20.0); // 定期送信の周波数
-        step_            = this->declare_parameter<int>("step", 2);                  // 十字キー1回の増分
+        // パラメータ（必要なら起動時に上書き可能）
+        publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 20.0);
+        step_            = this->declare_parameter<int>("step", 2);
+        min_deg_         = this->declare_parameter<int>("min_deg", -180);
+        max_deg_         = this->declare_parameter<int>("max_deg",  180);
 
-        pub_ = this->create_publisher<std_msgs::msg::String>("angle_cmd", rclcpp::QoS(10).reliable());
+        // min/max の妥当化
+        if (min_deg_ >= max_deg_) { min_deg_ = -180; max_deg_ = 180; }
+
+        pub_ = this->create_publisher<std_msgs::msg::String>(
+            "angle_cmd", rclcpp::QoS(10).reliable());
 
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "/joy", rclcpp::SensorDataQoS(),
             std::bind(&AngleSendNode::joy_callback, this, std::placeholders::_1));
 
-        // タイマー（publish_rate_hz_ に基づく周期）
         auto period = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::duration<double>(1.0 / std::max(1e-6, publish_rate_hz_)));
         timer_ = this->create_wall_timer(period, std::bind(&AngleSendNode::on_timer, this));
 
-        RCLCPP_INFO(this->get_logger(), "angle_cmd will be published at %.2f Hz (step=%d)",
-                    publish_rate_hz_, step_);
+        RCLCPP_INFO(this->get_logger(),
+            "publish @ %.2f Hz, step=%d, range=[%d,%d]",
+            publish_rate_hz_, step_, min_deg_, max_deg_);
     }
 
 private:
-    // -999〜+999に丸めて "A0x+003" 形式にする
-    static int clamp3(int v) {
-        if (v >  180) return  180;
-        if (v < -180) return -180;
+    // 範囲サチュレート
+    int clamp_deg(int v) const {
+        if (v > max_deg_) return max_deg_;
+        if (v < min_deg_) return min_deg_;
         return v;
     }
 
-    std::string format_signed3(const std::string& prefix, int value)
-    {
+    // "+123" / "-005" 形式で3桁ゼロ埋め
+    std::string format_signed3(const std::string& prefix, int value) const {
         std::ostringstream ss;
         ss << prefix
            << (value < 0 ? '-' : '+')
@@ -55,37 +56,29 @@ private:
         return ss.str();
     }
 
-    void publish_value(const char* prefix, int value)
-    {
+    void publish_value(const char* prefix, int value) {
         std_msgs::msg::String out;
-        out.data = format_signed3(prefix, clamp3(value));
+        out.data = format_signed3(prefix, clamp_deg(value));
         pub_->publish(out);
     }
 
-    // 定期送信（毎周期、現在値を2本とも送る）
-    void on_timer()
-    {
+    // 定期送信：現在値を必ず [-180,180] に収めて2本送る
+    void on_timer() {
         publish_value("A0p", up_down_);
         publish_value("A0r", right_left_);
-        // ログはウルサくなりがちなのでスロットル
         RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                             "tick A0p=%s  A0r=%s",
-                             format_signed3("A0p", up_down_).c_str(),
-                             format_signed3("A0r", right_left_).c_str());
+            "A0p=%s  A0r=%s",
+            format_signed3("A0p", clamp_deg(up_down_)).c_str(),
+            format_signed3("A0r", clamp_deg(right_left_)).c_str());
     }
 
-    // Joy入力で状態だけ更新（送信はしない）
-    void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
-    {
-        // 配列長チェック（axes[6], axes[7] を使う）
+    // Joy入力：状態更新時点でサチュレート
+    void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         if (msg->axes.size() > 7) {
-            // 上: axes[7] == 1, 下: == -1
-            if (msg->axes[7] == 1)   up_down_   -= step_;
-            else if (msg->axes[7] == -1) up_down_   += step_;
-
-            // 左: axes[6] == 1, 右: == -1
-            if (msg->axes[6] == 1)   right_left_ -= step_;
-            else if (msg->axes[6] == -1) right_left_ += step_;
+            if (msg->axes[7] ==  1) up_down_   = clamp_deg(up_down_   - step_);
+            if (msg->axes[7] == -1) up_down_   = clamp_deg(up_down_   + step_);
+            if (msg->axes[6] ==  1) right_left_= clamp_deg(right_left_- step_);
+            if (msg->axes[6] == -1) right_left_= clamp_deg(right_left_+ step_);
         }
     }
 
@@ -97,6 +90,8 @@ private:
     int right_left_;
     double publish_rate_hz_;
     int step_;
+    int min_deg_;
+    int max_deg_;
 };
 
 int main(int argc, char **argv)
